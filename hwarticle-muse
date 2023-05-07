@@ -1,0 +1,54 @@
+#!/bin/bash
+
+TOOLS_DIR=$(dirname "$(readlink -f "$0")")
+TEMPLATE_DIR=${TOOLS_DIR}"/templates"
+FOP_XCONF=/usr/share/publican/fop/fop.xconf
+MUSE_INIT="
+-l ${TOOLS_DIR}/hwarticle-muse-init.el
+-l ~/mydoc/prog/HellwolfDotEmacs/working/my/16-muse-tags.el
+-l ~/mydoc/prog/HellwolfDotEmacs/working/my/16-muse-ubb.el
+"
+
+function do_docbook2pdf() {
+    local basename=$1
+    local outputdir=$2
+
+    xmlto -o "$outputdir" fo "${outputdir}/${basename}.xml"
+    #sed -i 's/font-family=\"/font-family=\"Zysong,/g' "${basename}.fo"
+    fop -c "${FOP_XCONF}" "${outputdir}/${basename}.fo" "${outputdir}/${basename}.pdf"
+}
+
+for MUSE_FILE in "$@";do
+    MUSE_FILE_BASENAME=$(basename "$MUSE_FILE")
+    MUSE_FILE_BASENAME=${MUSE_FILE_BASENAME%.muse}
+    MUSE_FILE_DIRNAME=$(dirname $(readlink -f "$MUSE_FILE"))
+    OUTPUT_DIR=${MUSE_FILE_DIRNAME}/output
+
+    [ ! -d "$OUTPUT_DIR" ] && mkdir "$OUTPUT_DIR"
+
+    TEMPLATE_DIR=${TEMPLATE_DIR} \
+    emacs -q -batch \
+        --no-site-file \
+        $MUSE_INIT \
+        -f muse-batch-publish-files \
+        hwarticle-xhtml \
+        --output-dir="$OUTPUT_DIR" \
+        "$MUSE_FILE"
+
+    emacs -q -batch \
+        --no-site-file \
+        $MUSE_INIT \
+        -f muse-batch-publish-files \
+        docbook \
+        --output-dir="$OUTPUT_DIR" \
+        "$MUSE_FILE"
+    do_docbook2pdf "$MUSE_FILE_BASENAME" "$OUTPUT_DIR"
+
+    emacs -q -batch \
+        --no-site-file \
+        $MUSE_INIT \
+        -f muse-batch-publish-files \
+        ubb \
+        --output-dir="$OUTPUT_DIR" \
+        "$MUSE_FILE"
+done
